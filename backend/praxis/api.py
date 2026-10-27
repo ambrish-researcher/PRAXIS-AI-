@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 from .store import Store, TERMINAL
 from .engine import Engine, TOOLS
 from . import integrations, sandbox
+from .planning import AnalyticsOptions, WorkspaceOptions
 
 
 class Source(BaseModel):
@@ -41,6 +42,9 @@ class Source(BaseModel):
 class MissionSpec(BaseModel):
     objective: str = Field(min_length=10, max_length=4000)
     domain: Literal["auto", "software", "data", "research"] = "auto"
+    planning_mode: Literal["auto", "offline", "nvidia", "nightshift"] = "auto"
+    analytics_options: AnalyticsOptions | None = None
+    workspace_options: WorkspaceOptions | None = None
     csv_data: str = Field(default="", max_length=1_000_000)
     sources: list[Source] = Field(default_factory=list, max_length=20)
     timeout_seconds: int = Field(default=120, ge=1, le=300)
@@ -110,7 +114,7 @@ def create_app(root=None, start_worker=True):
     def capabilities():
         return {
             "tools": TOOLS,
-            "planner": "Deterministic capability adapters; optional inference proposal endpoint",
+            "planner": "Schema-validated NVIDIA/Nightshift mission planning with permission-checked DAG execution; explicit offline fallback",
             "limits": [
                 "No arbitrary shell execution",
                 "No live web research",
@@ -145,7 +149,17 @@ def create_app(root=None, start_worker=True):
                 "approval",
                 "User approved generated code execution in network-isolated, resource-limited Docker containers",
             )
-            return store.update(mid, approved=True, state="CREATED")
+            from .planning import MissionPlan
+            from .runner import fingerprint
+
+            return store.update(
+                mid,
+                approved=True,
+                approval_plan_hash=fingerprint(
+                    MissionPlan.model_validate(m["compiled_plan"])
+                ),
+                state="CREATED",
+            )
 
     @app.post("/api/missions/{mid}/cancel")
     def cancel(mid: str):

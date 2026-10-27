@@ -67,7 +67,9 @@ def test_data_execution_evidence_artifacts_and_skill_transfer(client):
     assert m["experiments"][0]["metrics"]["baseline"]["missed"] == 1
     assert m["experiments"][0]["metrics"]["candidate"]["true_positives"] == 1
     assert all(p["status"] == "completed" for p in m["plan"])
-    assert m["decisions"][0]["evidence_ids"][0] == m["evidence"][0]["id"]
+    assert m["decisions"][0]["evidence_ids"][0] == next(
+        e["id"] for e in m["evidence"] if e["title"] == "Uploaded CSV"
+    )
     report = client.get(f"/api/missions/{mid}/artifacts/report.md")
     assert report.status_code == 200 and "Measurement error" in report.text
     assert client.get(f"/api/missions/{mid}/artifacts/secret.env").status_code == 404

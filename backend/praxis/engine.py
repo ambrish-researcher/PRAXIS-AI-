@@ -16,6 +16,27 @@ from . import sandbox, templates
 
 TOOLS = [
     {
+        "id": "analytics",
+        "name": "Grouped analytics and correlation",
+        "domain": "data",
+        "permission": "local_only",
+        "description": "Grouped SQL aggregation or independently verified Pearson correlation over supplied numeric CSV columns.",
+    },
+    {
+        "id": "workspace",
+        "name": "Record application builder",
+        "domain": "software",
+        "permission": "approval_required",
+        "description": "Build task, inventory or contact CRUD apps with SQLite persistence. Validate baseline, improve input validation, and verify HTTP CRUD in Docker.",
+    },
+    {
+        "id": "synthesis",
+        "name": "Evidence dossier",
+        "domain": "research",
+        "permission": "local_only",
+        "description": "Combine actual upstream results, artifact hashes and provenance into a consolidated report; no invented conclusions.",
+    },
+    {
         "id": "software",
         "name": "Calculator application builder",
         "domain": "software",
@@ -79,7 +100,14 @@ class Engine:
         self.stop = threading.Event()
         self.worker = None
         self.deadlines = {}
+        self.step_offsets = {}
+        self.artifact_scopes = {}
+        from .operations import analytics, workspace, synthesis
+
         self.adapters = {
+            "analytics": lambda mid: analytics(self, mid),
+            "workspace": lambda mid: workspace(self, mid),
+            "synthesis": lambda mid: synthesis(self, mid),
             "software": self.software,
             "data": self.data,
             "research": self.research,
@@ -133,6 +161,7 @@ class Engine:
 
     def step(self, mid, index, status, detail):
         self.check(mid)
+        index += self.step_offsets.get(mid, 0)
         plan = self.store.get(mid)["plan"]
         if status == "running" and any(
             plan[d]["status"] != "completed" for d in plan[index]["dependencies"]
@@ -190,6 +219,7 @@ class Engine:
         self.check(mid)
         folder = self.store.root / "artifacts" / mid
         folder.mkdir(parents=True, exist_ok=True)
+        name = self.artifact_scopes.get(mid, "") + name
         path = folder / name
         if isinstance(content, bytes):
             path.write_bytes(content)
@@ -205,145 +235,9 @@ class Engine:
         return path
 
     def run(self, mid):
-        m = self.store.get(mid)
-        self.deadlines[mid] = time.monotonic() + m["timeout_seconds"]
-        try:
-            self.state(
-                mid, "ANALYZING", "Checking objective, inputs, and available tools"
-            )
-            domain = (
-                m["domain"] if m["domain"] != "auto" else infer_domain(m["objective"])
-            )
-            if (
-                domain == "software"
-                and "calculator" not in m["objective"].lower()
-                and "arithmetic" not in m["objective"].lower()
-            ):
-                raise MissionFailure(
-                    "Software generation currently supports arithmetic calculator web applications only. General app generation is not implemented."
-                )
-            if domain == "software" and not m["approved"]:
-                self.store.update(mid, domain=domain)
-                self.state(
-                    mid,
-                    "WAITING_FOR_APPROVAL",
-                    "Approval required: run generated calculator tests in restricted Docker containers; no network access",
-                )
-                return
-            self.store.update(
-                mid,
-                domain=domain,
-                attempts=m["attempts"] + 1,
-                evidence=[],
-                decisions=[],
-                experiments=[],
-                artifacts=[],
-                result=None,
-                error=None,
-            )
-            self.state(
-                mid,
-                "PLANNING",
-                "Constructing the dependency graph for the selected tool adapter",
-            )
-            labels = {
-                "software": [
-                    "Generate source and test contract",
-                    "Compare parser strategies",
-                    "Independently verify HTTP app",
-                    "Package source and record skill",
-                ],
-                "data": [
-                    "Import CSV and inspect schema",
-                    "Query statistics and compare anomaly strategies",
-                    "Verify rows and calibrated detector",
-                    "Publish evidence report and skill",
-                ],
-                "research": [
-                    "Index supplied documents",
-                    "Retrieve passages and compare evidence",
-                    "Check numeric conflicts and source coverage",
-                    "Publish reproducible research bundle",
-                ],
-            }[domain]
-            self.store.update(
-                mid,
-                plan=[
-                    {
-                        "id": f"task-{i}",
-                        "label": label,
-                        "dependencies": [] if i == 0 else [i - 1],
-                        "status": "pending",
-                    }
-                    for i, label in enumerate(labels)
-                ],
-            )
-            prior = next(
-                (
-                    s
-                    for s in self.store.skills()
-                    if s["domain"] == domain and s["verified"]
-                ),
-                None,
-            )
-            if prior:
-                supported = {"data": "median_mad", "software": "restricted_ast"}
-                if prior["procedure"].get("strategy") != supported.get(domain):
-                    raise MissionFailure(
-                        "Stored skill strategy is unsupported by the current adapter"
-                    )
-                self.store.update(mid, skill_id=prior["id"])
-                self.store.event(
-                    mid,
-                    "skill_loaded",
-                    "Loaded verified executable strategy before execution",
-                    {"skill_id": prior["id"], "procedure": prior["procedure"]},
-                )
-            self.state(mid, "RUNNING", "Executing dependency graph")
-            result = self.adapters[domain](mid)
-            self.check(mid)
-            self.store.update(mid, result=result)
-            self.state(mid, "COMPLETED", "Deliverables verified and persisted")
-        except Cancelled:
-            self.store.event(mid, "cancelled", "Worker acknowledged cancellation")
-        except Exception as exc:
-            # No provider errors or secret-bearing subprocess commands are logged.
-            message = (
-                str(exc)
-                if isinstance(exc, (MissionFailure, sandbox.SandboxError, ValueError))
-                else f"Internal {type(exc).__name__}; inspect local server logs without exposing credentials"
-            )
-            if self.store.get(mid)["state"] != "CANCELLED":
-                current = self.store.get(mid)
-                self.store.update(
-                    mid,
-                    state="FAILED",
-                    error=message,
-                    attempts=max(current["attempts"], m["attempts"] + 1),
-                )
-                self.store.event(mid, "failure", message)
-                if current.get("skill_id"):
-                    skill = next(
-                        (
-                            s
-                            for s in self.store.skills()
-                            if s["id"] == current["skill_id"]
-                        ),
-                        None,
-                    )
-                    if skill:
-                        skill["evaluations"].append(
-                            {
-                                "mission_id": mid,
-                                "at": now(),
-                                "passed": False,
-                                "tests": ["Workflow verification"],
-                                "failure": message,
-                            }
-                        )
-                        self.store.save_skill(skill)
-        finally:
-            self.deadlines.pop(mid, None)
+        from .runner import run
+
+        return run(self, mid)
 
     def sandbox_test(self, mid, folder, filename):
         for attempt in range(2):
@@ -367,7 +261,14 @@ class Engine:
 
     def skill(self, mid, domain, name, procedure, evaluation, limitations):
         self.check(mid)
-        existing = next((s for s in self.store.skills() if s["domain"] == domain), None)
+        existing = next(
+            (
+                s
+                for s in self.store.skills()
+                if s.get("procedure", {}).get("adapter") == procedure.get("adapter")
+            ),
+            None,
+        )
         ev = {"mission_id": mid, "at": now(), **evaluation}
         if existing:
             if existing["procedure"] != procedure:
