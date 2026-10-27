@@ -147,3 +147,11 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# PRAXIS local execution and test output
+.venv/
+__pycache__/
+.pytest_cache/
+.praxis/
+test-results/
+playwright-report/

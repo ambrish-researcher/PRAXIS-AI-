@@ -1,0 +1,4 @@
+[
+  {"title":"Laboratory report A (illustrative)","text":"This document describes a battery experiment. Battery lifetime = 120 hours. The battery lifetime measurement used a constant load and 20 degree ambient temperature.","url":"https://example.org/report-a","published_at":"2026-01-10"},
+  {"title":"Laboratory report B (illustrative)","text":"This document describes another battery experiment. Battery lifetime = 90 hours. Battery lifetime may change with load and ambient temperature; those conditions were not reported.","url":"https://example.org/report-b","published_at":"2026-02-10"}
+]
