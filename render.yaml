@@ -1,0 +1,28 @@
+# Review the paid-service/disk requirements in docs/deployment.md before applying.
+services:
+  - type: web
+    name: praxis-api
+    runtime: docker
+    plan: starter
+    branch: praxis-implementation
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    disk:
+      name: praxis-state
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PRAXIS_DATA_DIR
+        value: /var/data/praxis
+      - key: PRAXIS_SERVE_WEB
+        value: "1"
+      - key: PRAXIS_SECURE_COOKIES
+        value: "1"
+      - key: PRAXIS_SESSION_SECRET
+        generateValue: true
+      - key: PRAXIS_DEMO_PASSWORD
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: PRAXIS_ALLOWED_ORIGINS
+        sync: false

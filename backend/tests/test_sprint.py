@@ -292,3 +292,125 @@ def test_meterless_documented_headers_and_auth(monkeypatch):
     assert calls[1][0] == "https://runtime.example/v1/chat/completions"
     assert all(headers["meterless-app"] == "praxis" for _, headers in calls)
     assert calls[1][1]["meterless-scope"] == "user"
+
+
+def test_private_demo_sessions_csrf_logout_and_login_budget(tmp_path, monkeypatch):
+    monkeypatch.setenv("PRAXIS_DEMO_PASSWORD", "demo-password-for-tests-only")
+    monkeypatch.setenv("PRAXIS_SESSION_SECRET", "test-session-secret")
+    with TestClient(create_app(tmp_path, start_worker=False)) as c:
+        assert c.get("/api/session").json()["required"]
+        assert c.get("/api/missions").status_code == 401
+        assert c.post("/api/session", json={"password": "wrong"}).status_code == 401
+        r = c.post("/api/session", json={"password": "demo-password-for-tests-only"})
+        assert r.status_code == 200
+        assert (
+            "HttpOnly" in r.headers["set-cookie"]
+            and "SameSite=lax" in r.headers["set-cookie"]
+        )
+        assert c.get("/api/session").json()["authenticated"]
+        assert c.get("/api/missions").status_code == 200
+        assert (
+            c.post(
+                "/api/missions",
+                headers={"Origin": "https://evil.example"},
+                json={"objective": "Analyze revenue data", "csv_data": CSV},
+            ).status_code
+            == 403
+        )
+        assert c.delete("/api/session").status_code == 200
+        assert c.get("/api/missions").status_code == 401
+        for _ in range(5):
+            assert c.post("/api/session", json={"password": "wrong"}).status_code == 401
+        assert c.post("/api/session", json={"password": "wrong"}).status_code == 429
+
+
+def test_auth_signatures_and_expiry(monkeypatch):
+    from backend.praxis.auth import DemoAuth
+    import base64, hashlib, hmac
+
+    monkeypatch.setenv("PRAXIS_DEMO_PASSWORD", "test-password")
+    auth = DemoAuth()
+    token = auth.login("test-password", "test-client")
+    assert (
+        auth.valid(token)
+        and not auth.valid(token + "tampered")
+        and not auth.valid("bad-signature")
+    )
+    payload = (
+        base64.urlsafe_b64encode(json.dumps({"expires": 0}).encode())
+        .decode()
+        .rstrip("=")
+    )
+    expired = (
+        payload
+        + "."
+        + hmac.new(auth.secret, payload.encode(), hashlib.sha256).hexdigest()
+    )
+    assert not auth.valid(expired)
+
+
+def test_production_web_serving_keeps_api_and_protects_data(tmp_path, monkeypatch):
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text("<html>PRAXIS production</html>")
+    monkeypatch.setenv("PRAXIS_SERVE_WEB", "1")
+    monkeypatch.setenv("PRAXIS_WEB_DIR", str(web))
+    monkeypatch.setenv("PRAXIS_DEMO_PASSWORD", "private-demo")
+    with TestClient(create_app(tmp_path / "data", start_worker=False)) as c:
+        assert c.get("/").status_code == 200 and "PRAXIS production" in c.get("/").text
+        assert c.get("/api/health").json()["status"] == "ok"
+        assert c.get("/api/missions").status_code == 401
+        assert c.get("/api/not-real").status_code == 401
+        assert (
+            c.post("/api/session", json={"password": "private-demo"}).status_code == 200
+        )
+        assert c.get("/api/not-real").status_code == 404
+
+
+def test_cross_domain_reconciles_exact_source_metrics_with_measured_csv(client):
+    sources = [
+        {
+            "title": "Sales note",
+            "text": "Revenue total = 210 USD. The revenue records require review.",
+        },
+        {
+            "title": "Finance note",
+            "text": "Revenue total = 215 USD. The revenue records require review.",
+        },
+    ]
+    mid = create(client, domain="auto", sources=sources)
+    m = wait(client, mid)
+    assert m["state"] == "COMPLETED", m["error"]
+    dossier = client.get(
+        f"/api/missions/{mid}/artifacts/synthesis--dossier.json"
+    ).json()
+    rows = dossier["numeric_reconciliation"]
+    assert [r["numeric_match"] for r in rows] == [True, False]
+    assert [r["difference"] for r in rows] == [0, 5]
+    assert all(r["computed_csv_total"] == 210 for r in rows)
+
+
+def test_replanning_feedback_does_not_disclose_invalid_raw_cells(client, monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-only")
+    calls = []
+
+    async def completion(provider, system, content, **kwargs):
+        calls.append(content)
+        opts = (
+            {"operation": "correlate", "x_column": "private", "y_column": "revenue"}
+            if len(calls) == 1
+            else {"operation": "group", "group_by": "region", "value_column": "revenue"}
+        )
+        return json.dumps(
+            plan([task(id="analysis", tool="analytics", options=opts)])
+        ), {"model": "test-nemotron", "latency_ms": 1}
+
+    monkeypatch.setattr(integrations, "complete", completion)
+    csv = "region,revenue,private\nEast,10,sensitive-private-cell\nWest,20,sensitive-private-cell\nEast,30,sensitive-private-cell\nWest,40,sensitive-private-cell\nEast,50,sensitive-private-cell"
+    mid = create(client, planning_mode="nvidia", csv_data=csv)
+    m = wait(client, mid)
+    assert m["state"] == "COMPLETED", m["error"]
+    assert len(calls) == 2 and all(
+        "sensitive-private-cell" not in call for call in calls
+    )
+    assert m["replan_count"] == 1

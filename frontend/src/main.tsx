@@ -36,10 +36,31 @@ import type { Mission, Event, Skill, Node, Evidence } from "./types";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/dm-sans";
 import "./style.css";
+import MissionIntelligence from "./MissionIntelligence";
+import SessionGate from "./SessionGate";
 const Universe = lazy(() => import("./Universe"));
 const emptyNodes: Node[] = [];
 const terminal = ["COMPLETED", "FAILED", "CANCELLED"];
 const samples = {
+  auto: {
+    objective:
+      "Investigate the revenue dataset, compare the supplied source reports, and assemble a verified evidence dossier.",
+    csv: "region,revenue,orders\nEast,100,10\nWest,110,11\nEast,95,9\nWest,102,10\nEast,108,11\nWest,99,10\nEast,105,10\nWest,98,9\nEast,980,12",
+    sources: JSON.stringify(
+      [
+        {
+          title: "Sales operations note",
+          text: "The revenue dataset contains unusually high revenue on the last observation. Revenue total = 1797 USD. The source team has not confirmed whether the unusual revenue is a valid bulk order.",
+        },
+        {
+          title: "Finance review note",
+          text: "The revenue dataset requires reconciliation. Revenue total = 1800 USD. Revenue and order counts should be checked against actual source records before assuming a cause.",
+        },
+      ],
+      null,
+      2,
+    ),
+  },
   software: {
     objective:
       "Build a functional calculator web application with safe arithmetic, test it, improve the parser, and deliver the verified source.",
@@ -117,7 +138,14 @@ function App() {
     [events, setEvents] = useState<Event[]>([]),
     [skills, setSkills] = useState<Skill[]>([]),
     [integrations, setIntegrations] = useState<
-      { id: string; state: string; detail: string; model?: string }[]
+      {
+        id: string;
+        state: string;
+        detail: string;
+        model?: string;
+        last_checked?: string;
+        configuration_state?: string;
+      }[]
     >([]),
     [health, setHealth] = useState<{
       worker: boolean;
@@ -125,7 +153,9 @@ function App() {
     } | null>(null);
   const [error, setError] = useState(""),
     [modal, setModal] = useState(false),
-    [domain, setDomain] = useState<"software" | "data" | "research">("data"),
+    [domain, setDomain] = useState<"auto" | "software" | "data" | "research">(
+      "data",
+    ),
     [objective, setObjective] = useState(samples.data.objective),
     [csv, setCsv] = useState(samples.data.csv),
     [sources, setSources] = useState(""),
@@ -134,6 +164,17 @@ function App() {
     [query, setQuery] = useState(""),
     [kind, setKind] = useState("all"),
     [mobileNav, setMobileNav] = useState(false);
+  const [planningMode, setPlanningMode] = useState("auto");
+  const [analyticalOperation, setAnalyticalOperation] = useState("none");
+  const [columnA, setColumnA] = useState("");
+  const [columnB, setColumnB] = useState("");
+  const [appKind, setAppKind] = useState("tasks");
+  const [appTitle, setAppTitle] = useState("Mission workspace");
+  const csvColumns =
+    csv
+      .split(/\r?\n/)[0]
+      ?.split(",")
+      .map((s) => s.trim()) || [];
   const dialog = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!modal) return;
@@ -183,7 +224,11 @@ function App() {
       setIntegrations((old) =>
         ii.map((i) => {
           const o = old.find((x) => x.id === i.id);
-          return o?.state === "ready" ? o : i;
+          return o?.last_checked &&
+            o.configuration_state === i.state &&
+            o.model === i.model
+            ? o
+            : i;
         }),
       );
       setHealth(hh);
@@ -252,17 +297,31 @@ function App() {
         label: p.label,
         kind: "task",
         detail: p.detail || p.status,
+        status: p.status,
         parent: p.dependencies.length
           ? `task-${p.dependencies[0]}`
           : mission.id,
       })),
-      {
-        id: "tool-" + mission.domain,
-        label: mission.domain + " adapter",
-        kind: "tool",
-        detail: "Registered bounded workflow tool",
-        parent: mission.id,
-      },
+      ...(mission.execution_graph?.length
+        ? mission.execution_graph.map((t) => ({
+            id: "tool-" + t.id,
+            label: t.tool + " adapter",
+            kind: "tool",
+            status: t.status,
+            detail: t.purpose,
+            parent: t.depends_on.length
+              ? "tool-" + t.depends_on[0]
+              : mission.id,
+          }))
+        : [
+            {
+              id: "tool-" + mission.domain,
+              label: mission.domain + " adapter",
+              kind: "tool",
+              detail: "Registered bounded workflow tool",
+              parent: mission.id,
+            },
+          ]),
       ...mission.evidence.map((e) => ({
         id: e.id,
         label: e.title,
@@ -310,6 +369,7 @@ function App() {
   );
   function chooseExample(d: typeof domain) {
     setDomain(d);
+    setAnalyticalOperation("none");
     setObjective(samples[d].objective);
     setCsv(samples[d].csv);
     setSources(samples[d].sources);
@@ -319,7 +379,10 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      const parsed = domain === "research" ? JSON.parse(sources) : [];
+      const parsed =
+        (domain === "research" || domain === "auto") && sources.trim()
+          ? JSON.parse(sources)
+          : [];
       if (!Array.isArray(parsed))
         throw new Error("Sources must be a JSON array");
       const m = await api<Mission>("/missions", {
@@ -327,7 +390,28 @@ function App() {
         body: JSON.stringify({
           objective,
           domain,
-          csv_data: domain === "data" ? csv : "",
+          csv_data: domain === "data" || domain === "auto" ? csv : "",
+          planning_mode: planningMode,
+          analytics_options:
+            (domain === "data" || domain === "auto") &&
+            analyticalOperation !== "none"
+              ? {
+                  operation: analyticalOperation,
+                  ...(analyticalOperation === "group"
+                    ? {
+                        group_by: columnA || csvColumns[0],
+                        value_column: columnB || csvColumns[1],
+                      }
+                    : {
+                        x_column: columnA || csvColumns[1],
+                        y_column: columnB || csvColumns[2],
+                      }),
+                }
+              : null,
+          workspace_options:
+            domain === "software" && !/calculator|arithmetic/i.test(objective)
+              ? { kind: appKind, title: appTitle }
+              : null,
           sources: parsed,
         }),
       });
@@ -864,13 +948,14 @@ function App() {
                           )}
                         </div>
                       </section>
+                      <MissionIntelligence mission={mission} />
                       {mission.state === "WAITING_FOR_APPROVAL" && (
                         <section className="approval">
                           <ShieldCheck size={25} />
                           <div>
                             <h3>Your approval is required</h3>
                             <p>
-                              Execute generated calculator tests in Docker: no
+                              Execute generated application tests in Docker: no
                               network, read-only source, non-root user, 128 MB
                               memory and bounded runtime. The host has no
                               execution fallback.
@@ -1094,6 +1179,7 @@ function App() {
                             <Universe
                               nodes={filteredNodes}
                               onSelect={setNode}
+                              selectedId={node?.id}
                             />
                           </Suspense>
                         </section>
@@ -1371,6 +1457,13 @@ function App() {
                         </h2>
                         {i.model && <code>{i.model}</code>}
                         <p>{i.detail}</p>
+                        {i.last_checked && (
+                          <small className="health-checked">
+                            Last checked{" "}
+                            {new Date(i.last_checked).toLocaleTimeString()} ·
+                            rerun to refresh
+                          </small>
+                        )}
                         {["nvidia", "nightshift"].includes(i.id) && (
                           <button
                             className="secondary"
@@ -1384,7 +1477,16 @@ function App() {
                                 });
                                 setIntegrations((old) =>
                                   old.map((x) =>
-                                    x.id === i.id ? { ...x, ...result } : x,
+                                    x.id === i.id
+                                      ? {
+                                          ...x,
+                                          ...result,
+                                          configuration_state:
+                                            x.configuration_state || x.state,
+                                          last_checked:
+                                            new Date().toISOString(),
+                                        }
+                                      : x,
                                   ),
                                 );
                               } catch (e) {
@@ -1443,18 +1545,64 @@ function App() {
               </button>
             </div>
             <form onSubmit={submit}>
+              <div className="quick-missions">
+                <span className="eyebrow">DEMO STARTING POINTS</span>
+                <div>
+                  <button type="button" onClick={() => chooseExample("auto")}>
+                    Cross-domain dossier <ArrowUpRight size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      chooseExample("software");
+                      setObjective(
+                        "Build a task board application with persistent records, test CRUD, improve validation, and verify it.",
+                      );
+                      setAppKind("tasks");
+                      setAppTitle("Hackathon Launchboard");
+                    }}
+                  >
+                    Build a task board <ArrowUpRight size={12} />
+                  </button>
+                </div>
+              </div>
               <label htmlFor="domain">Capability</label>
               <select
                 id="domain"
                 value={domain}
                 onChange={(e) => chooseExample(e.target.value as typeof domain)}
               >
+                <option value="auto">Auto — compose registered tools</option>
                 <option value="data">Data investigation — CSV</option>
                 <option value="software">
-                  Software — calculator application
+                  Software — calculator and record applications
                 </option>
                 <option value="research">Research — supplied documents</option>
               </select>
+              <label htmlFor="planning-mode">Intelligence provider</label>
+              <select
+                id="planning-mode"
+                value={planningMode}
+                onChange={(e) => setPlanningMode(e.target.value)}
+              >
+                <option value="auto">
+                  Automatic — NVIDIA when configured, explicit offline fallback
+                </option>
+                <option value="nvidia">
+                  NVIDIA Nemotron — require live inference
+                </option>
+                <option value="nightshift">
+                  Meterless Nightshift — require configured runtime
+                </option>
+                <option value="offline">
+                  Offline — deterministic capability planner
+                </option>
+              </select>
+              <p className="form-note">
+                Only the objective, input schema and planning feedback are sent
+                to the selected provider. Source documents and CSV rows stay
+                local. Keys remain server-side.
+              </p>
               <label htmlFor="objective">What do you want to accomplish?</label>
               <textarea
                 autoFocus
@@ -1466,7 +1614,7 @@ function App() {
                 value={objective}
                 onChange={(e) => setObjective(e.target.value)}
               />
-              {domain === "data" && (
+              {(domain === "data" || domain === "auto") && (
                 <>
                   <div className="input-heading">
                     <label htmlFor="csv">Dataset (CSV, 5–10,000 rows)</label>
@@ -1492,13 +1640,13 @@ function App() {
                     id="csv"
                     className="code-input"
                     rows={7}
-                    required
+                    required={domain === "data"}
                     value={csv}
                     onChange={(e) => setCsv(e.target.value)}
                   />
                 </>
               )}
-              {domain === "research" && (
+              {(domain === "research" || domain === "auto") && (
                 <>
                   <label htmlFor="sources">
                     Sources (JSON array with title, text, optional url and
@@ -1508,7 +1656,7 @@ function App() {
                     id="sources"
                     className="code-input"
                     rows={8}
-                    required
+                    required={domain === "research"}
                     value={sources}
                     onChange={(e) => setSources(e.target.value)}
                   />
@@ -1518,11 +1666,100 @@ function App() {
                   </p>
                 </>
               )}
+              {(domain === "data" || domain === "auto") && csv.trim() && (
+                <div className="extended-options">
+                  <label htmlFor="analytical-operation">
+                    Additional verified analysis
+                  </label>
+                  <select
+                    id="analytical-operation"
+                    value={analyticalOperation}
+                    onChange={(e) => {
+                      setAnalyticalOperation(e.target.value);
+                      setColumnA("");
+                      setColumnB("");
+                    }}
+                  >
+                    <option value="none">Anomaly investigation only</option>
+                    <option value="group">Grouped SQL aggregation</option>
+                    <option value="correlate">Pearson correlation</option>
+                  </select>
+                  {analyticalOperation !== "none" && (
+                    <div className="column-selectors">
+                      <label>
+                        {analyticalOperation === "group"
+                          ? "Group by"
+                          : "X column"}
+                        <select
+                          aria-label="First analytical column"
+                          value={
+                            columnA ||
+                            (analyticalOperation === "group"
+                              ? csvColumns[0]
+                              : csvColumns[1])
+                          }
+                          onChange={(e) => setColumnA(e.target.value)}
+                        >
+                          {csvColumns.map((c) => (
+                            <option key={c}>{c}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        {analyticalOperation === "group"
+                          ? "Numeric value"
+                          : "Y column"}
+                        <select
+                          aria-label="Second analytical column"
+                          value={
+                            columnB ||
+                            (analyticalOperation === "group"
+                              ? csvColumns[1]
+                              : csvColumns[2])
+                          }
+                          onChange={(e) => setColumnB(e.target.value)}
+                        >
+                          {csvColumns.map((c) => (
+                            <option key={c}>{c}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+              {domain === "software" &&
+                !/calculator|arithmetic/i.test(objective) && (
+                  <div className="column-selectors">
+                    <label>
+                      Application schema
+                      <select
+                        aria-label="Application schema"
+                        value={appKind}
+                        onChange={(e) => setAppKind(e.target.value)}
+                      >
+                        <option value="tasks">Task board</option>
+                        <option value="inventory">Inventory</option>
+                        <option value="contacts">Contacts</option>
+                      </select>
+                    </label>
+                    <label>
+                      App title
+                      <input
+                        aria-label="App title"
+                        maxLength={80}
+                        value={appTitle}
+                        onChange={(e) => setAppTitle(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
               {domain === "software" && (
                 <p className="form-note">
-                  Supported today: arithmetic calculator web applications
-                  generated with a bounded template strategy. Testing requires
-                  your explicit approval and a local Docker sandbox.
+                  Calculator, task-board, inventory and contact apps use
+                  reviewed code templates. The planner selects options; it
+                  cannot run arbitrary generated code. Docker testing always
+                  requires your approval.
                 </p>
               )}
               <div className="form-footer">
@@ -1664,6 +1901,8 @@ function EvidenceCard({
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <SessionGate>
+      <App />
+    </SessionGate>
   </React.StrictMode>,
 );

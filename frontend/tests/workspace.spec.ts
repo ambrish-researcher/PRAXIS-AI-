@@ -27,10 +27,11 @@ test("landing, data mission, measured experiment, graph selection, evidence and 
     page.getByText("COMPLETED", { exact: true }).first(),
   ).toBeVisible({ timeout: 30000 });
   await expect(
-    page.getByText(
-      "SQL aggregates independently checked; held-out detector fixture passed",
-    ),
-  ).toBeVisible();
+    page.locator(".verified-text").filter({
+      hasText:
+        "SQL aggregates independently checked; held-out detector fixture passed",
+    }),
+  ).toBeVisible({ timeout: 30000 });
   await expect(page.getByRole("link", { name: /report.md/ })).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: /report.md/ }).click();
@@ -115,10 +116,12 @@ test("software gate, execution, failure diagnosis and downloadable source", asyn
   await page.getByRole("button", { name: "Launch mission" }).click();
   await expect(
     page.getByRole("heading", { name: "Your approval is required" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 30000 });
   await page.getByRole("button", { name: "Approve sandbox execution" }).click();
   await expect(
-    page.getByText("8/8 contract cases; 2 HTTP checks passed"),
+    page
+      .locator(".verified-text")
+      .filter({ hasText: "8/8 contract cases; 2 HTTP checks passed" }),
   ).toBeVisible({ timeout: 45000 });
   await expect(
     page.getByRole("link", { name: /calculator-source.zip/ }),
@@ -151,7 +154,9 @@ test("mobile and reduced motion have no horizontal overflow; research executes",
   await page.getByLabel("Capability").selectOption("research");
   await page.getByRole("button", { name: "Launch mission" }).click();
   await expect(
-    page.getByText("Selected quotations match supplied text exactly"),
+    page
+      .locator(".verified-text")
+      .filter({ hasText: "Selected quotations match supplied text exactly" }),
   ).toBeVisible({ timeout: 30000 });
   await expect(
     page.getByText(/identified 1 potential numeric contradictions/),
@@ -170,4 +175,81 @@ test("mobile and reduced motion have no horizontal overflow; research executes",
   await expect(
     page.getByText("Missing server-side configuration"),
   ).toBeVisible();
+});
+
+test("cross-domain demo executes a validated DAG and produces a real dossier", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter the workspace" }).click();
+  await page.getByRole("button", { name: "Create your first mission" }).click();
+  await page.getByRole("button", { name: "Cross-domain dossier" }).click();
+  await page.getByLabel("Intelligence provider").selectOption("offline");
+  await page.getByRole("button", { name: "Launch mission" }).click();
+  await expect(
+    page.getByText(
+      "All selected tools completed their independent checks; all artifact hashes verified.",
+    ),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.locator(".intelligence-brief").getByText("3 / 3 tools verified"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /synthesis--dossier.md/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("OFFLINE PLANNER", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/cross-domain-mission.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Intelligence graph", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "synthesis adapter" }),
+  ).toBeVisible();
+});
+
+test("record app demo requires approval and verifies actual HTTP CRUD and persistence", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter the workspace" }).click();
+  await page.getByRole("button", { name: "Create your first mission" }).click();
+  await page
+    .getByRole("button", { name: "Build a task board", exact: true })
+    .click();
+  await page.getByLabel("Intelligence provider").selectOption("offline");
+  await page.getByRole("button", { name: "Launch mission" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your approval is required" }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.locator(".tool-chain").getByText("workspace", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Approve sandbox execution" }).click();
+  await expect(
+    page.locator(".verified-text").filter({
+      hasText:
+        "7/7 CRUD contract cases; independent restart persistence and HTML checks passed",
+    }),
+  ).toBeVisible({ timeout: 45000 });
+  await expect(
+    page.getByRole("link", { name: /workspace-source.zip/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Experiments", exact: false })
+    .first()
+    .click();
+  await expect(
+    page.getByText(
+      "Strict record validation preserves CRUD and rejects invalid or unknown input",
+    ),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/record-app-experiment.png",
+    fullPage: true,
+  });
 });

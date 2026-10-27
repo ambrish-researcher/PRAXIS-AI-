@@ -57,6 +57,34 @@ export type Mission = {
   error: string | null;
   skill_id: string | null;
   attempts: number;
+  planning_mode?: string;
+  planner?: {
+    source: string;
+    model?: string;
+    detail?: string;
+    latency_ms?: number;
+    attempts?: number;
+  };
+  compiled_plan?: {
+    objective_summary: string;
+    success_criteria: string[];
+    constraints: string[];
+    tasks: {
+      id: string;
+      tool: string;
+      purpose: string;
+      depends_on: string[];
+      options: Record<string, unknown>;
+    }[];
+  };
+  execution_graph?: {
+    id: string;
+    tool: string;
+    purpose: string;
+    depends_on: string[];
+    status: string;
+  }[];
+  replan_count?: number;
 };
 export type Event = {
   seq: number;
@@ -85,4 +113,5 @@ export type Node = {
   kind: string;
   detail: string;
   parent?: string;
+  status?: string;
 };

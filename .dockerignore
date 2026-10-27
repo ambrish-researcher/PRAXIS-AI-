@@ -1,0 +1,12 @@
+.git
+.venv
+.praxis
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+**/__pycache__
+**/.pytest_cache
+.env
+.env.*
+!*.example

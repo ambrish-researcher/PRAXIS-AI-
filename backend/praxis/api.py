@@ -8,6 +8,8 @@ from typing import Literal
 from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from .auth import DemoAuth
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from .store import Store, TERMINAL
@@ -50,6 +52,10 @@ class MissionSpec(BaseModel):
     timeout_seconds: int = Field(default=120, ge=1, le=300)
 
 
+class Login(BaseModel):
+    password: str = Field(min_length=1, max_length=300)
+
+
 class Proposal(BaseModel):
     objective: str = Field(min_length=10, max_length=4000)
     provider: Literal["nvidia", "nightshift"]
@@ -58,6 +64,7 @@ class Proposal(BaseModel):
 def create_app(root=None, start_worker=True):
     store = Store(root or os.getenv("PRAXIS_DATA_DIR", ".praxis"))
     engine = Engine(store)
+    auth = DemoAuth()
 
     @asynccontextmanager
     async def lifespan(app):
@@ -68,11 +75,20 @@ def create_app(root=None, start_worker=True):
 
     app = FastAPI(title="PRAXIS Mission Engine", version="0.1.0", lifespan=lifespan)
     app.state.store, app.state.engine = store, engine
-    origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
+    origins = [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        *[
+            x.strip()
+            for x in os.getenv("PRAXIS_ALLOWED_ORIGINS", "").split(",")
+            if x.strip()
+        ],
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
     )
 
@@ -84,12 +100,24 @@ def create_app(root=None, start_worker=True):
         origin = request.headers.get("origin")
         if request.method != "GET" and origin and origin not in origins:
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
-        if token and request.url.path != "/api/health" and request.method != "OPTIONS":
-            provided = request.headers.get("authorization", "").removeprefix("Bearer ")
-            if not secrets.compare_digest(provided, token):
-                return JSONResponse(
-                    {"detail": "Authentication required"}, status_code=401
-                )
+        requires_auth = request.url.path.startswith(
+            "/api/"
+        ) and request.url.path not in {"/api/health", "/api/session"}
+        session_ok = bool(auth.password) and auth.valid(
+            request.cookies.get("praxis_session", "")
+        )
+        bearer_ok = bool(token) and secrets.compare_digest(
+            request.headers.get("authorization", "").removeprefix("Bearer ").encode(),
+            token.encode(),
+        )
+        if (
+            requires_auth
+            and (token or auth.password)
+            and not session_ok
+            and not bearer_ok
+            and request.method != "OPTIONS"
+        ):
+            return JSONResponse({"detail": "Authentication required"}, status_code=401)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -100,6 +128,40 @@ def create_app(root=None, start_worker=True):
             return store.get(mid)
         except KeyError:
             raise HTTPException(404, "Mission not found") from None
+
+    @app.get("/api/session")
+    def session(request: Request):
+        required = bool(auth.password or os.getenv("PRAXIS_API_TOKEN"))
+        return {
+            "required": required,
+            "authenticated": not required
+            or auth.valid(request.cookies.get("praxis_session", "")),
+            "password_login": bool(auth.password),
+        }
+
+    @app.post("/api/session")
+    def login(spec: Login, request: Request):
+        session_token = auth.login(
+            spec.password, request.client.host if request.client else "unknown"
+        )
+        response = JSONResponse({"authenticated": True})
+        response.set_cookie(
+            "praxis_session",
+            session_token,
+            httponly=True,
+            secure=request.url.scheme == "https"
+            or os.getenv("PRAXIS_SECURE_COOKIES") == "1",
+            samesite="lax",
+            max_age=21600,
+            path="/",
+        )
+        return response
+
+    @app.delete("/api/session")
+    def logout():
+        response = JSONResponse({"authenticated": False})
+        response.delete_cookie("praxis_session", path="/")
+        return response
 
     @app.get("/api/health")
     def health():
@@ -260,6 +322,13 @@ def create_app(root=None, start_worker=True):
                 "Inference unavailable; check server-side provider configuration and health",
             ) from None
 
+    web_dir = Path(os.getenv("PRAXIS_WEB_DIR", "frontend/dist"))
+    if os.getenv("PRAXIS_SERVE_WEB") == "1":
+        if not web_dir.is_dir():
+            raise RuntimeError(
+                "PRAXIS_SERVE_WEB requires a completed frontend production build"
+            )
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
     return app
 
 

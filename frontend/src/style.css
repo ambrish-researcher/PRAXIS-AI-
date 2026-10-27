@@ -2504,3 +2504,463 @@ a svg {
     transform: none;
   }
 }
+
+/* Sprint: evidence-first hierarchy and live mission intelligence. */
+.intelligence-brief {
+  background: linear-gradient(120deg, #15231d, #101a1b);
+  border-color: #3c5038;
+}
+.intelligence-heading {
+  padding: 23px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  border-bottom: 1px solid #33482f;
+}
+.intelligence-heading .eyebrow {
+  font-size: 9px;
+  color: #a0bd8d;
+  gap: 8px;
+}
+.intelligence-heading h3 {
+  font-size: 16px;
+  line-height: 1.7;
+  max-width: 700px;
+  margin-top: 10px;
+  color: #dbe7cf;
+  letter-spacing: -0.3px;
+}
+.planner-badge {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid #536845;
+  border-radius: 4px;
+  padding: 7px 10px;
+  color: #a2b690;
+  font: 8px monospace;
+  letter-spacing: 0.7px;
+}
+.planner-badge.model-backed {
+  border-color: #c0e78e;
+  color: #d8ffb0;
+  background: #35482a;
+}
+.intelligence-body {
+  padding: 24px;
+}
+.tool-chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 25px;
+}
+.tool-chain-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 145px;
+}
+.tool-chain-item > svg {
+  color: #6c8e63;
+}
+.tool-chain-item article {
+  flex: 1;
+  padding: 16px;
+  border: 1px solid #3a5033;
+  border-radius: 6px;
+  background: #112018;
+  min-width: 0;
+}
+.tool-chain-item strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #cce9ad;
+  margin: 12px 0 8px;
+}
+.tool-chain-item small {
+  display: block;
+  color: #9cb18d;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.tool-chain-item .eyebrow {
+  font-size: 8px;
+}
+.tool-dependencies {
+  display: block;
+  margin-top: 13px;
+  color: #728c68;
+  font: 8px monospace;
+}
+.task-indicator {
+  width: 6px;
+  height: 6px;
+  background: #7c9171;
+  border-radius: 50%;
+}
+.tool-chain-item .running {
+  border-color: #b1d986;
+  box-shadow: inset 0 0 24px #b1d98608;
+}
+.tool-chain-item .running .task-indicator {
+  background: #d5ff9f;
+  animation: execution-pulse 1.4s ease-in-out infinite;
+}
+.tool-chain-item .failed {
+  border-color: #a86450;
+}
+.mission-contract {
+  padding-top: 20px;
+  border-top: 1px solid #32452f;
+}
+.mission-contract > .eyebrow {
+  font-size: 8px;
+  color: #97b581;
+  gap: 8px;
+}
+.mission-contract ul {
+  padding: 0;
+  list-style: none;
+  margin: 13px 0 20px;
+}
+.mission-contract li {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #b7c9a9;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mission-progress {
+  height: 3px;
+  border-radius: 3px;
+  background: #2b3d26;
+  overflow: hidden;
+}
+.mission-progress span {
+  display: block;
+  height: 100%;
+  background: #c5ee9f;
+  transition: width 0.6s ease;
+}
+.mission-contract p {
+  font-size: 10px;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #a2bd8f;
+}
+.mission-contract p span {
+  font: 8px monospace;
+  color: #819e70;
+}
+.mission-contract .planner-detail {
+  display: block;
+  font-size: 10px;
+  color: #b4bf99;
+}
+.mission-contract .planner-note {
+  display: block;
+  color: #738c68;
+  font-size: 9px;
+}
+.quick-missions {
+  padding: 18px;
+  border: 1px solid #354e31;
+  border-radius: 6px;
+  background: #19291d;
+}
+.quick-missions > .eyebrow {
+  font-size: 8px;
+  color: #b0cb98;
+}
+.quick-missions > div {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.quick-missions button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 9px 12px;
+  background: #263b24;
+  border: 1px solid #4b6840;
+  border-radius: 4px;
+  color: #d1e8b8;
+}
+.quick-missions button:hover {
+  background: #3b542f;
+}
+.column-selectors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.modal .column-selectors select,
+.modal .column-selectors input {
+  margin-top: 9px;
+}
+.modal input:not([type="file"]) {
+  background: #0b1513;
+  border: 1px solid #344d3b;
+  color: #d5e1cb;
+  padding: 12px;
+  font-size: 12px;
+  border-radius: 5px;
+  width: 100%;
+  line-height: 1.6;
+}
+.extended-options {
+  margin-top: 20px;
+  border-top: 1px solid #30472c;
+}
+.scene-tooltip {
+  position: absolute;
+  pointer-events: none;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid #6a8652;
+  background: #122218e8;
+  backdrop-filter: blur(8px);
+  padding: 9px 14px;
+  border-radius: 5px;
+  font-size: 10px;
+  color: #d5ebbf;
+  max-width: 80%;
+  text-align: center;
+  line-height: 1.7;
+}
+.sidebar nav button {
+  font-size: 12px;
+}
+.page-heading p {
+  font-size: 12px;
+}
+.command-copy p {
+  font-size: 12px;
+}
+.workflow-cards p {
+  font-size: 11px;
+}
+.workflow-cards h3 {
+  font-size: 14px;
+}
+.plan-step strong {
+  font-size: 12px;
+}
+.plan-step small {
+  font-size: 11px;
+}
+.panel-heading h3 {
+  font-size: 14px;
+}
+.source-meta {
+  font-size: 11px;
+}
+.evidence-card > p {
+  font-size: 12px;
+}
+.decision dd,
+.experiment dd,
+.skill dd {
+  font-size: 12px;
+}
+.hero-copy {
+  animation: hero-arrive 0.9s ease both;
+}
+.hero-object {
+  animation: scene-arrive 1.5s ease both;
+}
+.hero .eyebrow {
+  letter-spacing: 1.8px;
+}
+.hero-bottom {
+  opacity: 0.8;
+}
+.hero-universe {
+  cursor: grab;
+}
+.hero-universe:active {
+  cursor: grabbing;
+}
+.hero-object:after {
+  content: "";
+  position: absolute;
+  inset: 14% 4%;
+  border: 1px solid #b4cf9a0c;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.fallback {
+  line-height: 1.8;
+}
+.hero h1 {
+  font-weight: 450;
+}
+.command-copy h2 {
+  font-weight: 450;
+}
+@keyframes execution-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 #c4eaa42a;
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 6px #c4eaa400;
+  }
+}
+@keyframes hero-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scene-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (max-width: 800px) {
+  .intelligence-heading {
+    flex-direction: column;
+    padding: 20px;
+  }
+  .intelligence-body {
+    padding: 20px;
+  }
+  .mission-contract p {
+    flex-direction: column;
+  }
+  .tool-chain-item {
+    min-width: 130px;
+  }
+  .intelligence-heading h3 {
+    font-size: 15px;
+  }
+  .column-selectors {
+    grid-template-columns: 1fr;
+  }
+  .page-heading p {
+    font-size: 10px;
+  }
+  .command-copy p {
+    font-size: 10px;
+  }
+  .workflow-cards p {
+    font-size: 10px;
+  }
+  .sidebar nav button {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy,
+  .hero-object,
+  .task-indicator {
+    animation: none !important;
+  }
+  .mission-progress span {
+    transition: none;
+  }
+}
+.session-gate {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  background: radial-gradient(ellipse at 50% 40%, #243724, #0b1214 65%);
+}
+.session-gate > section {
+  width: 510px;
+  max-width: 100%;
+  padding: 38px;
+  border: 1px solid #48613b;
+  background: #101c17;
+  border-radius: 10px;
+}
+.session-gate .eyebrow {
+  font-size: 9px;
+  color: #abc88d;
+  display: flex;
+  gap: 8px;
+}
+.session-gate section > svg {
+  margin-top: 35px;
+  color: #badb96;
+  stroke-width: 1;
+}
+.session-gate h1 {
+  font:
+    450 38px/1.15 "Manrope Variable",
+    sans-serif;
+  letter-spacing: -1.5px;
+  margin: 22px 0;
+}
+.session-gate p {
+  font-size: 12px;
+}
+.session-gate form {
+  margin-top: 25px;
+}
+.session-gate label {
+  display: block;
+  color: #b4caa3;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.session-gate input {
+  display: block;
+  border: 1px solid #4f6940;
+  background: #0b1510;
+  border-radius: 5px;
+  padding: 13px;
+  color: #d6e9c6;
+  width: 100%;
+  margin-bottom: 15px;
+}
+.session-gate .primary {
+  width: 100%;
+}
+.session-gate small {
+  display: block;
+  font: 8px monospace;
+  color: #7d966d;
+  margin-top: 30px;
+}
+.session-gate .failure-text {
+  margin: 17px 0;
+}
+.session-gate .secondary {
+  margin-top: 20px;
+}
+.health-checked {
+  display: block;
+  font: 8px monospace;
+  color: #8ba67a;
+  margin: -12px 0 18px;
+  line-height: 1.7;
+}

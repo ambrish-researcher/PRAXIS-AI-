@@ -116,6 +116,14 @@ class Engine:
     def start(self):
         # One worker process only. Recover interrupted missions with an explicit audit event.
         for m in self.store.list():
+            if m["state"] == "WAITING_FOR_APPROVAL" and not m.get("compiled_plan"):
+                self.store.update(m["id"], state="CREATED", approved=False)
+                self.store.event(
+                    m["id"],
+                    "recovery",
+                    "Migrating legacy approval to a schema-validated plan; fresh user approval is required",
+                )
+                continue
             if m["state"] not in TERMINAL | {"CREATED", "WAITING_FOR_APPROVAL"}:
                 self.store.update(
                     m["id"],

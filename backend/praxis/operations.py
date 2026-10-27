@@ -31,7 +31,12 @@ def analytical_rows(raw):
 
 
 def finite(value):
-    number = float(value)
+    try:
+        number = float(value)
+    except (ValueError, TypeError):
+        raise ValueError(
+            "Analytical numeric columns require complete finite numbers; no raw cell values are sent in planning feedback"
+        ) from None
     if not math.isfinite(number) or abs(number) >= 1e100:
         raise ValueError("Analytical values must be finite and bounded")
     return number
@@ -396,7 +401,55 @@ def synthesis(e, mid):
     evidence = list(m["evidence"])
     if not evidence:
         raise ValueError("Synthesis requires actual evidence")
-    e.step(mid, 1, "completed", f"Resolved {len(evidence)} evidence records")
+    reconciliation = []
+    data_results = [r for r in upstream.values() if r.get("statistics")]
+    research_results = [r for r in upstream.values() if r.get("conflicts")]
+    for data in data_results:
+        for column, stats in data["statistics"].items():
+            for research in research_results:
+                for conflict in research["conflicts"]:
+                    if (
+                        conflict["metric"].strip().lower()
+                        != column.strip().lower() + " total"
+                    ):
+                        continue
+                    for claim in conflict["claims"]:
+                        difference = claim["value"] - stats["sum"]
+                        reconciliation.append(
+                            {
+                                "column": column,
+                                "metric": conflict["metric"],
+                                "source_evidence_id": claim["evidence_id"],
+                                "source_claim": claim["value"],
+                                "computed_csv_total": stats["sum"],
+                                "difference": difference,
+                                "numeric_match": math.isclose(
+                                    claim["value"],
+                                    stats["sum"],
+                                    rel_tol=1e-10,
+                                    abs_tol=1e-10,
+                                ),
+                                "limitation": "Numeric comparison only. CSV units, source scope, time and authenticity are not independently established.",
+                            }
+                        )
+    if reconciliation:
+        e.evidence(
+            mid,
+            "Cross-source numeric reconciliation",
+            json.dumps(reconciliation),
+            "tool:source-data-reconciliation",
+            relationships=[
+                {"type": "compares_with", "target": row["source_evidence_id"]}
+                for row in reconciliation
+            ],
+            uncertainty="Matching numbers do not independently establish source authority, units or factual truth.",
+        )
+    e.step(
+        mid,
+        1,
+        "completed",
+        f"Resolved {len(evidence)} evidence records and {len(reconciliation)} exact metric comparisons",
+    )
     e.step(mid, 2, "running", "Recomputing upstream artifact hashes")
     for artifact in m["artifacts"]:
         path = e.store.root / "artifacts" / mid / artifact["name"]
@@ -417,6 +470,7 @@ def synthesis(e, mid):
     dossier = {
         "objective": m["objective"],
         "upstream_results": upstream,
+        "numeric_reconciliation": reconciliation,
         "evidence": [
             {
                 "id": v["id"],
@@ -442,6 +496,13 @@ def synthesis(e, mid):
             "Verification: " + result["verification"],
             "",
         ]
+    if reconciliation:
+        report += ["## Cross-source numeric reconciliation"]
+        report += [
+            f"- {row['metric']}: CSV total {row['computed_csv_total']}, source claim {row['source_claim']}, difference {row['difference']}; numeric match={row['numeric_match']}. Source [{row['source_evidence_id'][:8]}]. Units and source scope require review."
+            for row in reconciliation
+        ]
+        report += [""]
     report += ["## Provenance"] + [
         f"- [{v['id'][:8]}] {v['title']} — {v['locator']}" for v in evidence
     ]

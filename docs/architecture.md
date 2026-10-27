@@ -1,54 +1,33 @@
-# Architecture
+# PRAXIS execution architecture
 
-## Data and execution
+React/TypeScript/Three.js → same-origin API → FastAPI → one durable SQLite mission worker → registered tool adapters → independent verifiers → evidence/artifacts/skills.
 
-React/TypeScript → Vite same-origin `/api` proxy → FastAPI → SQLite + artifact files. One polling worker consumes CREATED missions. SQLite WAL persists mission documents, append-only event records, and skill versions/evaluations. A per-store lock serializes read-modify-write operations inside the single worker process. This does not support multiple API workers or distributed scheduling.
+## Planning boundary
 
-`backend/praxis/store.py` owns persistence; `api.py` owns request validation and control actions; `engine.py` orchestrates adapters and durable checkpoints; `sandbox.py` runs trusted generated tests; `templates.py` defines bounded calculator synthesis; `integrations.py` handles optional provider discovery/proposals.
+`planning.py` defines strict task/mission schemas. NVIDIA or documented Nightshift transport returns JSON tool proposals, not executable code. Allowed task IDs, typed tool options, actual input columns, unique tools and an acyclic dependency graph are validated. The planner sees objective/input schema and sanitized feedback, not raw document text or CSV rows. `integrations.py` retains server-side credentials, TLS checks and redirect protection. Explicit-provider failure is visible; automatic planning can record a transport failure and fall back offline.
 
-## State machine
+`runner.py` topologically orders validated tasks, constructs four internal verification stages per adapter, and executes only registered functions. Approval is tied to the entire plan digest before any generated-code testing. A real failure may trigger one model replan; completed tasks and tool scope must remain intact, failed-tool options must change, and the new proposal is revalidated. No model-authored criteria can disable the fixed tool verifiers.
 
-```mermaid
-stateDiagram-v2
-    [*] --> CREATED
-    CREATED --> ANALYZING
-    ANALYZING --> WAITING_FOR_APPROVAL: software, not approved
-    WAITING_FOR_APPROVAL --> CREATED: user approves
-    ANALYZING --> PLANNING: supported inputs and permission
-    PLANNING --> RUNNING
-    RUNNING --> EXPERIMENTING
-    EXPERIMENTING --> VERIFYING
-    VERIFYING --> COMPLETED
-    ANALYZING --> FAILED: unsupported or invalid
-    RUNNING --> FAILED: tool / input error
-    EXPERIMENTING --> FAILED: correctness gate
-    VERIFYING --> FAILED: failed independent check
-    FAILED --> CREATED: user retries, max 3 attempts
-    RUNNING --> CANCELLED: user cancels
-```
+## Tools and independent checks
 
-Cancellation is allowed in any nonterminal state, including approval waits. Execution checks deadlines/cancellation between stages and during the Docker process wait. A sandbox deadline kills/removes the named container. Each plan node lists dependency indexes; the scheduler refuses to start a node until its dependencies complete. Current adapter DAGs are linear, dynamically selected by domain, rather than arbitrary model-generated graphs. Extending a domain means adding a validated tool definition, adapter, test contract and frontend input schema.
+- `engine.py`: preserved calculator synthesis/improvement, CSV investigation, source research and skill persistence.
+- `operations.py`: grouped SQL/reference-Python analytics, statistics/reference-dot-product correlation, typed record-app generation, and measured upstream dossier synthesis.
+- `templates.py` / `workspace_template.py`: reviewed application-owned code. Model strings are encoded as typed configuration/data. Generated apps are tested in the restricted Docker sandbox; no arbitrary model commands are accepted.
+- `sandbox.py`: local Docker daemon, digest-pinned Python image, no network, read-only source/root, dropped capabilities, non-root UID, process/memory/CPU limits, cancellation and timeout. No host execution fallback.
+- `store.py`: SQLite WAL, mission JSON, append-only event stream, versioned procedures/evaluations. One process per database; this is not a distributed lease system.
 
-## Evidence and decisions
+Every selected tool must complete its independent contract. All artifact digests are recomputed before overall completion. Dossiers retain source-qualified uncertainty and can compare exact `<column> total` claims with actual CSV aggregates; numeric agreement is not a factual-authority or causal proof.
 
-Each evidence record has an ID, title, exact content, source locator, observed timestamp, SHA-256 digest, uncertainty and typed relationships. Research source publication timestamps are supplied metadata, not authenticated dates. Numeric discrepancies link back to both conflicting sources. `GET /api/evidence?q=` searches persisted source/output records across mission history.
+## Durable observability
 
-Decision records contain the objective, considered alternatives, selected action, explicit constraints, linked evidence IDs, execution result, verification reference, and remaining uncertainty. They are concise observable rationales; no hidden chain-of-thought is collected or fabricated.
+CREATED → ANALYZING → validated PLANNING → approval when required → RUNNING / EXPERIMENTING → VERIFYING → COMPLETED, FAILED or CANCELLED. All states and tool events originate in actual backend operations. Per-task DAG status, detailed dependency steps, parsed plan provenance, measured experiments, source hashes, concise decision rationales and skill evaluations persist. Interrupted nonterminal work restarts from immutable input, and legacy approval waits are upgraded to a validated plan requiring fresh approval. Completed history is retained.
 
-## Experiments and skills
+## Browser experience
 
-Software tests both a limited baseline and restricted AST candidate against identical cases. Data compares robust detection on a labeled synthetic fixture and validates separately on a held-out fixture; uploaded-data aggregates have an independent Python reference check. Research measures lexical retrieval coverage, retaining failure/limitations without treating coverage as truth.
+`MissionIntelligence.tsx` renders the actual validated contract and tool graph. `Universe.tsx` retains its WebGL context, camera and controls across data updates, disposes replaced geometry, caps pixel ratio/frame rate, pauses offscreen and respects reduced motion. Node selection, hover, focus and active-task pulses refer to real records. Visibility recovers after programmatic scroll/viewport restoration; user interaction wakes rendering. Keyboard node lists remain available without WebGL.
 
-Software/data procedures have a version, structured strategy identifier, preconditions, tests, history and per-mission evaluations. A later mission loads the persisted strategy before execution and reruns the full verification on its own inputs. Failed transfers are retained. Procedure changes increment the version when a newly verified strategy is saved. No training weights change; no universal transfer claim is made.
+## Hosted demo boundary
 
-## Rendering
+`auth.py` provides shared-password demo access with rate-limited login, signed expiring HttpOnly/SameSite sessions and exact-origin mutation checks. This is not multi-tenant identity. Production startup requires authentication, initializes its dedicated persistent directory, drops to UID 10001, and applies a private data-file umask before the API starts. The Vercel serverless proxy forwards API/session/artifact streams to a fixed configured HTTPS backend without provider credentials in the bundle.
 
-Three.js is lazy-loaded. The original landing object is a metallic torus-knot sculpture with sparse orbital markers. Mission graph nodes are constructed from actual persisted objectives, tasks, tool adapters, evidence, decisions, experiments, artifacts and skills. Edges map dependencies/provenance or mission ownership. OrbitControls supply zoom and rotation; raycasting selects a node. A parallel keyboard node list provides the same inspection data. Selected node details are rendered as text, never HTML.
-
-Reduced motion stops automatic rotation. The renderer caps pixel ratio at 1.5 and frames at 30 fps, pauses offscreen/in background, and disposes geometry/materials/controls/renderer on teardown. A WebGL initialization failure displays a text fallback while the node list remains available. Scene complexity is bounded by input limits; no GPU performance benchmark across devices is claimed.
-
-## Trust boundaries
-
-No user-provided commands or generated model code are run. Calculator expression evaluation whitelists bounded AST nodes and arithmetic, rejecting calls, attributes, powers and imports. Tool execution is approval-gated; Docker receives only a read-only per-mission directory and no application secrets. Inference credentials stay in the API environment, errors are sanitized, and redirects are disabled to avoid forwarding credentials to a redirected host. HTTP is allowed only for loopback inference; remote services require TLS.
-
-Artifacts are allowlisted against the mission manifest, served as downloads with nosniff, and identified by digest. The local UI is unauthenticated by design and must not be publicly exposed. Current host API processes can access their configured filesystem; this is not a hostile multi-user sandbox. Secrets in user-submitted documents are not automatically discovered/redacted: do not upload credentials.
+The production web image supports persistent planner/data/research operations. Standard Render web hosting does not supply the local Docker executor used by the software tools. Full generated-software execution requires an authorized Docker-capable Linux host; no unimplemented remote runner is represented as available. See deployment.md.

@@ -1,12 +1,8 @@
-# PRAXIS
+# PRAXIS — evidence-grounded intelligence
 
-An evidence-grounded local mission workspace with real execution, measured experiments, persistent audit records, and an interactive 3D intelligence graph.
+PRAXIS turns an objective into a validated tool plan, executes real operations, compares strategies, verifies outputs, and saves transferable procedures. The original bounded preview is extended rather than replaced.
 
-This is a working **bounded research preview**, not the complete general-purpose autonomous intelligence platform described in the master directive. The planner selects explicit capability adapters. Optional model inference proposes plans; model output is not silently executed.
-
-## Run
-
-Prerequisites: Linux/macOS development shell, Python 3.12+, `uv`, Node 22.12+ (tested with 24), npm, local Docker daemon, and Chromium for browser tests. The cloud environment already has these tools. The sandbox uses the local Unix Docker socket and therefore requires Linux-style Docker socket access.
+## Run the complete local application
 
 ```bash
 cd /workspace/PRAXIS-AI-
@@ -14,62 +10,62 @@ bash scripts/setup.sh
 bash scripts/dev.sh
 ```
 
-The API listens on port 8000 and the frontend on port 5173, both bound to loopback. On your own machine, open the frontend locally. The onboarding UI does not provide a localhost web preview. Stop the script with Ctrl+C. Run only **one** API worker against a data directory.
+Prerequisites: Python 3.12+, uv, Node 22.12+ (tested on 24), npm, local Linux Docker daemon, and system Chromium for browser tests. The frontend uses port 5173; FastAPI uses port 8000. Both development services bind loopback. One API process owns the SQLite queue. Do not use multiple API workers with the same data directory. Each cloud task already has an isolated checkout; do not create a Git worktree unless requested.
 
-The environment was implemented in the selected `ambrish-researcher/PRAXIS-AI-` checkout (with trailing hyphen), rather than creating a second repository for the slightly different name in the directive. No Git worktree is needed: every cloud task already has an isolated environment.
+## Intelligence and execution
 
-## What works
+- **NVIDIA Nemotron / Meterless Nightshift planning:** model-generated mission specifications are validated against a strict Pydantic schema, registered tool IDs, allowed options, supplied input columns and acyclic dependencies. The default NVIDIA model is `nvidia/nemotron-3.5-lightning-30b-a3b`; successful inference is never assumed. Provider output is data, not executable code or commands.
+- **Controlled adaptation:** two plan-validation attempts; at most one execution replan after an actual failure. A replan must change failed-tool options, preserve completed tasks and tool scope, and satisfy policy again. Tool verifiers remain fixed, independent of the model. Model-written success criteria describe intent; the enforced acceptance gates are the tool contracts and artifact-integrity checks.
+- **Honest fallback:** automatic planning uses NVIDIA when configured and records transport failures before falling back offline. Explicit provider mode fails with a clear error instead of pretending inference occurred. Offline mode composes registered workflows from supplied inputs.
+- **Durability:** mission state, dependency steps, real events, provenance, experiment results, decisions, skills and artifacts persist under `.praxis/` (ignored by Git). Cancellation, timeouts, approval gates, bounded retries and interrupted-worker recovery remain enabled.
 
-| Workflow | Actual execution | Boundaries |
-| --- | --- | --- |
-| Software | Generates a calculator HTTP application, executes an eight-case arithmetic/safety contract in Docker, diagnoses a limited summation parser, revises it to a restricted AST evaluator, retests, independently checks the HTTP app, and exports a source ZIP | Calculator objectives only; template synthesis, not general AI code generation. Approval required before execution. |
-| Data | Imports CSV, executes SQLite aggregates, compares z-score and median/MAD detection on labeled calibration data, checks uploaded-data aggregates independently in Python, tests a held-out fixture, and exports an SVG chart, JSON statistics, report, and reproduction script | 5–10,000 rows; max 1 MB; 1–40 unique columns; complete finite numeric columns. No imputation or causal inference. Calibration is explicitly synthetic, not an uploaded-data ground-truth benchmark. |
-| Research | Indexes supplied documents, retrieves exact passages, measures lexical coverage of two retrieval strategies, compares matching numeric claims, verifies quotations, and exports source-qualified findings and reproduction files | At least two supplied sources; no live web browsing. Keyword ranking is not semantic entailment. Contradictions use matching `metric = number` / `metric: number` syntax and identical units; authenticity and truth remain unverified. |
+## Registered tools
 
-All three workflows persist state, task dependencies, events, evidence provenance, decision explanations, experiments, and downloadable artifacts. Software/data strategies persist as versioned skills; subsequent missions load the procedure and independently evaluate transfer, including recording failures. This is procedural reuse, **not model fine-tuning**.
+| Tool | Executed work and independent checks |
+| --- | --- |
+| `software` | Calculator HTTP app: generate source, run 8 arithmetic/safety cases in Docker, diagnose baseline parser failure, revise, retest, separately verify HTTP output, export ZIP. |
+| `workspace` | Task, inventory or contact CRUD app: SQLite persistence, typed record schemas, seven actual HTTP CRUD/rejection cases before and after validation improvement, separate server-restart persistence check, source ZIP. |
+| `data` | CSV schema inspection, SQLite aggregates, median/MAD anomalies, measured synthetic strategy calibration, independent Python aggregate checks and held-out fixture, chart/report/reproduction artifacts. |
+| `analytics` | Grouped SQL aggregates or Pearson correlation on named CSV columns. Separate Python grouping or centered-dot-product calculations verify outputs. |
+| `research` | Exact passage retrieval over supplied sources, lexical strategy comparison, provenance checks and narrowly defined numeric-claim conflicts. No live web research or truth verification. |
+| `synthesis` | Combine real upstream outputs into an evidence dossier, independently verify artifact hashes, and compare exact `<column> total` source claims with computed CSV totals. Numeric agreement does not establish source authority or unit equivalence. |
 
-The interface includes an original interactive 3D landing sculpture, mission command center, live execution stream, data-connected graph with orbit/zoom/filter/selection, experiment laboratory, evidence search, decision inspector, skill history, and integration status. Keyboard-accessible node lists and WebGL failure fallback preserve access to mission data. Rendering is lazy-loaded, pixel-ratio-capped, throttled to 30 fps, paused offscreen, and respects reduced motion.
+The UI includes an original physically lit interactive 3D landing sculpture, responsive mission command center, validated tool DAG/contract, live execution stream, real-data intelligence graph with orbit/zoom/selection/focus/filtering, experiments, evidence search, auditable decisions and skill evaluations. The renderer reuses its context/camera across mission updates, caps rendering quality/frame rate, pauses offscreen, disposes resources, respects reduced motion and preserves keyboard-accessible node inspection.
 
-## Verify
+## Fast judge demonstration
 
-With `scripts/dev.sh` running in another terminal:
+1. Enter the workspace and create a mission. Choose **Cross-domain dossier** and **Offline** (or explicit NVIDIA only after configuring and verifying it). The supplied illustrative CSV/documents execute data + research + synthesis, producing actual statistics, source conflicts and a source-to-data comparison.
+2. Choose **Build a task board**. Review the validated plan, approve restricted test execution, watch the baseline fail input-validation cases and the candidate pass all seven HTTP checks plus an independent persistence test. Download the tested source.
+3. Launch a second data or record-app mission. Skill library shows a separate independent transfer evaluation. Failed transfers are retained. This is procedural reuse, not model fine-tuning.
+4. Explore the graph and decision inspector. Evidence, events, metrics and artifact hashes correspond to actual backend records.
+
+See [demo](docs/demo.md), [sprint evidence](docs/sprint.md) and [deployment](docs/deployment.md).
+
+## Providers and credentials
+
+`.env.example` documents settings but is **not automatically loaded**. Export server variables or configure them securely in hosting settings. Never place keys in frontend variables or commit `.env` values.
+
+- NVIDIA: `NVIDIA_API_KEY`, optionally `NVIDIA_BASE_URL` and `NVIDIA_MODEL`. Authorize `integrate.api.nvidia.com` for the default endpoint. `POST /api/integrations/nvidia/health` discovers the exact model; real mission planning then calls inference. No key is currently available in this task, so live inference remains unverified.
+- Meterless Nightshift: `NIGHTSHIFT_BASE_URL`, `NIGHTSHIFT_MODEL`, `NIGHTSHIFT_API_KEY`. The official documented runtime requires a real token, including on localhost; `rt-local` is rejected. The adapter normalizes base URL suffixes and sends documented app/scope headers. Cloud loopback cannot reach the user's Windows machine. Model discovery distinguishes unauthorized from offline.
+- Meterless Agent Engine: official repository documentation was investigated. Its open engines are local implementation specs/reference/conformance suites, not a hosted Agent Engine API. No undocumented SDK/endpoint is implemented and no conformance claim is made. See the pinned documentation references in `docs/sprint.md`.
+- Zetaris: live connector remains modular/pending authoritative installation-specific documentation and reachable infrastructure. CSV exports are ordinary inputs, not a claimed live integration.
+
+Only objective/schema/planning feedback are sent to the planner. Raw CSV rows and source-document text are not sent by this implementation. Inference prompts and schema labels remain untrusted; all execution permissions are enforced server-side.
+
+## Test
+
+With `scripts/dev.sh` running:
 
 ```bash
 bash scripts/check.sh
 ```
 
-Or separately:
+Or run `.venv/bin/python -m pytest backend/tests -q`, `npm --cache /tmp/praxis-npm run build --prefix frontend`, then `(cd frontend && npm --cache /tmp/praxis-npm run test:e2e)`. Browser tests use `/usr/bin/chromium` unless `CHROMIUM_PATH` is set. See `docs/sprint.md` for current observed outcomes; initial-preview results are retained in `docs/validation.md` as historical evidence.
 
-```bash
-.venv/bin/python -m pytest backend/tests -q
-npm --cache /tmp/praxis-npm run build --prefix frontend
-cd frontend
-npm --cache /tmp/praxis-npm run test:e2e
-```
+## Secure deployment and limits
 
-Browser tests use `/usr/bin/chromium`; set `CHROMIUM_PATH` for another system installation. No browser binary download is required in this cloud environment. See [validation](docs/validation.md) for observed results, and [demo](docs/demo.md) for reproducible acceptance flows.
+`Dockerfile`, `render.yaml` and `frontend/vercel.json` prepare production web serving and a Vercel same-origin API proxy. Hosted startup requires demo authentication. Optional `PRAXIS_DEMO_PASSWORD` enables rate-limited password login and signed HttpOnly/SameSite sessions; use HTTPS, secure cookies and exact `PRAXIS_ALLOWED_ORIGINS`. This is shared judge/demo access, not multi-tenant identity. API bearer authentication remains available for API clients.
 
-## Configuration and integrations
+A Render web container can run the persistent planner and data/research tools; the software tools additionally need a Docker-capable execution host. The production web image deliberately does not add a privileged daemon or unsafe fallback. Vercel alone cannot run the platform. Full hosting requirements and current external blockers are explicit in [deployment.md](docs/deployment.md).
 
-[.env.example](.env.example) lists server-side settings. It is documentation, **not automatically sourced**. Export required variables before starting the API. Never commit real values or put inference keys in frontend variables.
-
-- **NVIDIA Nemotron:** OpenAI-compatible `/models` discovery and `/chat/completions` client. Default model: `nvidia/nemotron-3.5-lightning-30b-a3b`. A real health request checks whether this exact configured model is listed; availability is not assumed. Configure `NVIDIA_API_KEY`, optionally `NVIDIA_BASE_URL` and `NVIDIA_MODEL`. Allow the configured HTTPS destination through environment networking; the default is `integrate.api.nvidia.com`.
-- **Meterless Nightshift:** configurable OpenAI-compatible base URL, key, and model. Cloud loopback does not reach the user's Windows service. A remote endpoint must use authorized HTTPS access. An unauthenticated loopback development endpoint is permitted.
-- **Meterless Agent Engine:** no verified API documentation or credentials were supplied, and no vendor SDK/interface was available in the repository. Status is explicitly unverified. No invented integration is implemented.
-- **Zetaris:** live connector not implemented or verified. CSV exports are supported as ordinary data inputs. A live connector needs installation-specific supported SQL/JDBC/REST documentation, connection details, and authorized network access. No undocumented endpoints are called.
-
-`GET /api/integrations` reports configuration metadata without secrets. `POST /api/integrations/nvidia/health` and `POST /api/integrations/nightshift/health` run real discovery only when configured. `POST /api/proposals` accepts `{ "provider": "nvidia", "objective": "..." }` and returns an inference proposal; this does not execute it. Inference is optional and is not wired into the deterministic mission planner.
-
-No live sponsor inference was verified in this environment: required keys/URLs were absent. Missing-configuration behavior and synthetic HTTP responses are tested separately and do not count as live integration verification.
-
-## Safety and persistence
-
-SQLite and mission artifacts live in `.praxis/` by default, configurable with `PRAXIS_DATA_DIR`. This directory is ignored by Git but contains user-provided data: treat it as private. Stop the service before copying the directory for backup; do not assume SQLite WAL files can be discarded while running.
-
-Generated tests execute with no network, no capabilities, non-root UID, read-only root/source mounts, bounded CPU/memory/PIDs/time, and no application credentials passed into the container. There is **no host execution fallback** when Docker is unavailable. The image is pinned by digest. Docker is a trusted administrator prerequisite, not a multi-tenant security boundary for hostile code. Only application-owned template tests execute today; no shell or arbitrary user code is accepted.
-
-Approval is required for software test execution. Cancel/retry actions are explicit API operations; cancellation terminates active sandbox execution. Mission and tool budgets are bounded. Interrupted nonterminal missions are recovered from immutable inputs after an abrupt worker restart; graceful shutdown may mark an active mission failed and require a manual retry. Completed records survive restart.
-
-This is a **local single-user development service**, not an Internet deployment. Both services bind loopback. Optional `PRAXIS_API_TOKEN` protects API access for API clients; the current browser UI does not supply bearer tokens. Multi-user identity, authorization, quotas, PostgreSQL/distributed workers, production TLS/reverse proxy, and remote deployment are not implemented.
-
-See [architecture](docs/architecture.md) and [remaining work](docs/limitations.md). No NVIDIA ASPIRE performance comparison is claimed.
+PRAXIS remains bounded: approved calculator/record schemas, CSV analytics and supplied-source research. It does not execute unrestricted model code, browse arbitrary sites, prove causal/factual truth, fine-tune a model, or provide production multi-user infrastructure. No performance superiority over NVIDIA ASPIRE is claimed. See [remaining limitations](docs/limitations.md).
